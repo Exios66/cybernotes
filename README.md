@@ -1,6 +1,4 @@
-Here is a comprehensive README file for your project based on the provided code:
-
-# Notes Application
+# CyberNotes Application
 
 This project is a web-based note-taking application that allows users to create, save, edit, search, and preview notes with Markdown support. The application uses [Dexie.js](https://dexie.org/) for local IndexedDB storage and provides both light and dark themes, which can be toggled by the user.
 
