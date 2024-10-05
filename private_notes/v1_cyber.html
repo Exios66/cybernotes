@@ -1,0 +1,130 @@
+<script>
+    const db = new Dexie('NotesDatabase');
+    db.version(1).stores({
+        notes: '++id,title,content,tags,createdAt,updatedAt'
+    });
+
+    let currentNote = null;
+
+    function toggleTheme() {
+        document.body.classList.toggle('light-mode');
+        localStorage.setItem('theme', document.body.classList.contains('light-mode') ? 'light' : 'dark');
+    }
+
+    document.getElementById('toggle-theme').addEventListener('click', toggleTheme);
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light') {
+            document.body.classList.add('light-mode');
+        }
+        loadNotes();
+    });
+
+    function insertMarkdown(start, end) {
+        const textarea = document.getElementById('note-content');
+        const startPos = textarea.selectionStart;
+        const endPos = textarea.selectionEnd;
+        const selectedText = textarea.value.substring(startPos, endPos);
+        const replacement = start + selectedText + end;
+        textarea.value = textarea.value.substring(0, startPos) + replacement + textarea.value.substring(endPos);
+        textarea.focus();
+        textarea.selectionStart = startPos + start.length;
+        textarea.selectionEnd = startPos + replacement.length - end.length;
+    }
+
+    document.getElementById('add-note').addEventListener('click', () => {
+        currentNote = null;
+        document.getElementById('note-title').value = '';
+        document.getElementById('note-content').value = '';
+        document.getElementById('tag-input').value = '';
+    });
+
+    document.getElementById('toggle-preview').addEventListener('click', () => {
+        const content = document.getElementById('note-content');
+        const preview = document.getElementById('preview');
+        if (content.style.display !== 'none') {
+            content.style.display = 'none';
+            preview.style.display = 'block';
+            preview.innerHTML = marked(content.value);
+        } else {
+            content.style.display = 'block';
+            preview.style.display = 'none';
+        }
+    });
+
+    async function saveNote() {
+        const title = document.getElementById('note-title').value;
+        const content = document.getElementById('note-content').value;
+        const tags = document.getElementById('tag-input').value.split(',').map(tag => tag.trim());
+        const timestamp = new Date().toISOString();
+
+        if (currentNote) {
+            await db.notes.update(currentNote.id, {
+                title,
+                content,
+                tags,
+                updatedAt: timestamp
+            });
+        } else {
+            await db.notes.add({
+                title,
+                content,
+                tags,
+                createdAt: timestamp,
+                updatedAt: timestamp
+            });
+        }
+
+        loadNotes();
+    }
+
+    async function loadNotes() {
+        const noteList = document.getElementById('note-list');
+        noteList.innerHTML = '';
+        const notes = await db.notes.toArray();
+        notes.forEach(note => {
+            const li = document.createElement('li');
+            li.textContent = note.title;
+            li.addEventListener('click', () => loadNote(note.id));
+            noteList.appendChild(li);
+        });
+    }
+
+    async function loadNote(id) {
+        currentNote = await db.notes.get(id);
+        document.getElementById('note-title').value = currentNote.title;
+        document.getElementById('note-content').value = currentNote.content;
+        document.getElementById('tag-input').value = currentNote.tags.join(', ');
+    }
+
+    document.getElementById('search-input').addEventListener('input', async (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const notes = await db.notes.toArray();
+        const filteredNotes = notes.filter(note => 
+            note.title.toLowerCase().includes(searchTerm) || 
+            note.content.toLowerCase().includes(searchTerm) ||
+            note.tags.some(tag => tag.toLowerCase().includes(searchTerm))
+        );
+        updateNoteList(filteredNotes);
+    });
+
+    function updateNoteList(notes) {
+        const noteList = document.getElementById('note-list');
+        noteList.innerHTML = '';
+        notes.forEach(note => {
+            const li = document.createElement('li');
+            li.textContent = note.title;
+            li.addEventListener('click', () => loadNote(note.id));
+            noteList.appendChild(li);
+        });
+    }
+
+    ['note-title', 'note-content', 'tag-input'].forEach(id => {
+        document.getElementById(id).addEventListener('input', saveNote);
+    });
+
+    loadNotes();
+</script>
+</body>
+<html>
